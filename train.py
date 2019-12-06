@@ -9,7 +9,15 @@ from build_vocab import Vocabulary
 from model import EncoderCNN, DecoderRNN
 from torch.nn.utils.rnn import pack_padded_sequence
 from torchvision import transforms
+from nltk.translate.bleu_score import sentence_bleu
 
+def get_bleu(gt, y):
+    score = 0
+    for i in range(gt.shape[0]):
+        score += score = sentence_bleu(gt[i, :], candidate[i, :])
+    score /= gt.shape[0]
+    
+    return score
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -51,7 +59,13 @@ def main(args):
     
     # Train the models
     total_step = len(data_loader)
-    for epoch in range(args.num_epochs):
+    train_loss_arr = []
+    val_loss_arr = []
+    train_bleu_arr = []
+    val_bleu_arr = []
+    for epoch in range(1, args.num_epochs+1, 1):
+        iteration_loss = []
+        iteration_bleu = []
         for i, (images, captions, lengths) in enumerate(data_loader):
             
             # Set mini-batch dataset
@@ -64,18 +78,23 @@ def main(args):
             outputs = decoder(features, captions, lengths)
             #print(outputs.shape, targets.shape)
             loss = criterion(outputs, targets)
+            iteration_loss.append(loss.item())
             decoder.zero_grad()
             encoder.zero_grad()
             loss.backward()
             optimizer.step()
+            
+            #get BLEU score for corresponding batch
+            bleu_score_batch = get_bleu(targets, outputs)
+            iteration_bleu.append(bleu_score_batch)
 
             # Print log info
             if i % args.log_step == 0:
                 print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}, Perplexity: {:5.4f}'
                       .format(epoch, args.num_epochs, i, total_step, loss.item(), np.exp(loss.item())))
                 f_log = open(os.path.join(args.model_path, "log.txt"),"a+")
-                f_log.write("Epoch" + str(epoch)+"/"+str(args.num_epochs)+" loss"+ str(loss.item())+" perplexity" + 
-                            str(np.exp(loss.item()))+"\n")
+                f_log.write("Epoch: " + str(epoch) + "/" + str(args.num_epochs) + "Step: " + str(i) + "/" + 
+                            str(total_step) + " loss: "+ str(loss.item()) + " perplexity: " + str(np.exp(loss.item()))+"\n") 
                 f_log.close()
                 
             # Save the model checkpoints
@@ -84,31 +103,49 @@ def main(args):
                      args.model_path, 'decoder-{}-{}.ckpt'.format(epoch+1, i+1))) 
                 torch.save(encoder.state_dict(), os.path.join(
                      args.model_path, 'encoder-{}-{}.ckpt'.format(epoch+1, i+1))) 
-               
-                val_loss = 0
-                val_steps = 0
-                for j, (images_val, captions_val, lengths_val) in enumerate(val_loader):
-                    print(j)
-                    # Set mini-batch dataset
-                    images_val = images_val.to(device)
-                    captions_val = captions_val.to(device)
-                    targets = pack_padded_sequence(captions_val, lengths_val, batch_first=True)[0]
+        
+        train_loss_arr.append(np.array(iteration_loss))
+        train_bleu_arr.append(np.array(iteration_bleu))
+        
+        val_loss = 0
+        val_steps = 0
+        val_iteration_loss = []
+        val_iteration_bleu = []
+        for j, (images_val, captions_val, lengths_val) in enumerate(val_loader):
+            #are we supposed to do net.eval() here or is it okay cause we continue the training process?
+            
+            # Set mini-batch dataset
+            images_val = images_val.to(device)
+            captions_val = captions_val.to(device)
+            targets = pack_padded_sequence(captions_val, lengths_val, batch_first=True)[0]
 
-                    # Forward, backward and optimize
-                    features = encoder(images_val)
-                    outputs = decoder(features, captions_val, lengths_val)
-                    #print(outputs.shape, targets.shape)
-                    val_loss += criterion(outputs, targets).item()
-                    val_steps += 1
-                    print(val_loss)
+            # Forward, backward and optimize
+            features = encoder(images_val)
+            outputs = decoder(features, captions_val, lengths_val)
+            #print(outputs.shape, targets.shape)
+            loss = criterion(outputs, targets).item()
+            val_loss += loss
+            val_iteration_loss.append(loss)
+            val_steps += 1
+            
+            #get BLEU score for corresponding batch
+            bleu_score_batch = get_bleu(targets, outputs)
+            val_iteration_bleu.append(bleu_score_batch)
 
-                    val_loss /= val_steps
-                    print('Epoch [{}/{}], Step [{}/{}],  Val Loss: {:.4f}, Perplexity: {:5.4f}'
-                          .format(epoch, args.num_epochs, i, total_step, loss.item(), np.exp(loss.item())))
-                    f_log = open(os.path.join(args.model_path, "log.txt"),"a+")
-                    f_log.write("Epoch" + str(epoch)+"/"+str(args.num_epochs)+" val loss"+ str(loss.item())+" perplexity" + 
-                                str(np.exp(loss.item()))+"\n")
-                    f_log.close()
+        val_loss /= val_steps
+        print('Epoch [{}/{}], Val Loss: {:.4f}, Perplexity: {:5.4f}'
+              .format(epoch, args.num_epochs, val_loss, np.exp(val_loss)))
+        f_log = open(os.path.join(args.model_path, "log.txt"),"a+")
+        f_log.write("Epoch: " + str(epoch) + "/" + str(args.num_epochs) + 
+                    " val loss: " + str(val_loss) + " perplexity: " + str(np.exp(val_loss)) + "\n") 
+        f_log.close()
+        val_loss_arr.append(np.array(var_iteration_loss))
+        val_bleu_arr.append(np.array(var_iteration_bleu))
+        
+    np.save(os.path.join(args.model_path, "train_loss.npy"), np.array(train_loss_array))
+    np.save(os.path.join(args.model_path, "val_loss.npy"), np.array(val_loss_array))
+    np.save(os.path.join(args.model_path, "train_bleu.npy"), np.array(train_bleu_array))
+    np.save(os.path.join(args.model_path, "val_bleu.npy"), np.array(val_bleu_array))
                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
