@@ -12,12 +12,24 @@ from torchvision import transforms
 from nltk.translate.bleu_score import sentence_bleu
 
 def get_bleu(gt, y):
-    score = 0
+    score_full = 0
+    score_1 = 0
+    score_2 = 0
+    score_3 = 0
+    score_4 = 0
     for i in range(gt.shape[0]):
-        score += score = sentence_bleu(gt[i, :], candidate[i, :])
-    score /= gt.shape[0]
+        score_full += sentence_bleu(gt[i, :], candidate[i, :])
+        score_1 += sentence_bleu(gt[i, :], candidate[i, :], weights = (1,0,0,0))
+        score_2 += sentence_bleu(gt[i, :], candidate[i, :], weights = (0,1,0,0))
+        score_3 += sentence_bleu(gt[i, :], candidate[i, :], weights = (0,0,1,0))
+        score_4 += sentence_bleu(gt[i, :], candidate[i, :], weights = (0,0,0,1))
+    score_full /= gt.shape[0]
+    score_1 /= gt.shape[0]
+    score_2 /= gt.shape[0]
+    score_3 /= gt.shape[0]
+    score_4 /= gt.shape[0]
     
-    return score
+    return [score_full, score_1, score_2, score_3, score_4]
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
