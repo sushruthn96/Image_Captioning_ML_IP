@@ -11,18 +11,38 @@ from torch.nn.utils.rnn import pack_padded_sequence
 from torchvision import transforms
 from nltk.translate.bleu_score import sentence_bleu
 
-def get_bleu(gt, y):
+def get_bleu(gt1, candidate, vocab):
+    gt = gt1.cpu().detach().numpy()
     score_full = 0
     score_1 = 0
     score_2 = 0
     score_3 = 0
     score_4 = 0
-    for i in range(gt.shape[0]):
-        score_full += sentence_bleu(gt[i, :], candidate[i, :])
-        score_1 += sentence_bleu(gt[i, :], candidate[i, :], weights = (1,0,0,0))
-        score_2 += sentence_bleu(gt[i, :], candidate[i, :], weights = (0,1,0,0))
-        score_3 += sentence_bleu(gt[i, :], candidate[i, :], weights = (0,0,1,0))
-        score_4 += sentence_bleu(gt[i, :], candidate[i, :], weights = (0,0,0,1))
+    for i in range(gt.shape[0]):    
+        sampled_caption = []
+        for word_id in candidate[i]:
+            word = vocab.idx2word[word_id]
+            sampled_caption.append(word)
+            if word == '<end>':
+                break
+        sentence_can = ' '.join(sampled_caption)
+        
+        gt_caption = []
+#         gt[i] = gt[i].cpu().detach().numpy()
+        for word_id in gt[i]:
+            word = vocab.idx2word[word_id]
+            gt_caption.append(word)
+            if word == '<end>':
+                break
+        sentence_gt = ' '.join(gt_caption)
+#         print(gt[i])
+#         print(candidate[i,:].shape)
+#         print(sentence_bleu(gt[[i, :]], candidate[i, :]))
+        score_full += sentence_bleu([sentence_gt], sentence_can)
+        score_1 += sentence_bleu([sentence_gt], sentence_can, weights = (1,0,0,0))
+        score_2 += sentence_bleu([sentence_gt], sentence_can, weights = (0,1,0,0))
+        score_3 += sentence_bleu([sentence_gt], sentence_can, weights = (0,0,1,0))
+        score_4 += sentence_bleu([sentence_gt], sentence_can, weights = (0,0,0,1))
     score_full /= gt.shape[0]
     score_1 /= gt.shape[0]
     score_2 /= gt.shape[0]
@@ -97,16 +117,20 @@ def main(args):
             optimizer.step()
             
             #get BLEU score for corresponding batch
-            bleu_score_batch = get_bleu(targets, outputs)
+            sampled_ids = decoder.sample(features)
+            sampled_ids = sampled_ids.cpu().numpy()
+#             print(sampled_ids.shape, captions.shape,targets.shape)
+            bleu_score_batch = get_bleu(captions, sampled_ids,vocab)
+#             print(bleu_score_batch)
             iteration_bleu.append(bleu_score_batch)
 
             # Print log info
             if i % args.log_step == 0:
-                print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}, Perplexity: {:5.4f}'
-                      .format(epoch, args.num_epochs, i, total_step, loss.item(), np.exp(loss.item())))
+                print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}, Bleu: '
+                      .format(epoch, args.num_epochs, i, total_step, loss.item())+ str(bleu_score_batch))
                 f_log = open(os.path.join(args.model_path, "log.txt"),"a+")
-                f_log.write("Epoch: " + str(epoch) + "/" + str(args.num_epochs) + "Step: " + str(i) + "/" + 
-                            str(total_step) + " loss: "+ str(loss.item()) + " perplexity: " + str(np.exp(loss.item()))+"\n") 
+                f_log.write("Epoch: " + str(epoch) + "/" + str(args.num_epochs) + " Step: " + str(i) + "/" + 
+                            str(total_step) + " loss: "+ str(loss.item()) + " Bleu: " + str(bleu_score_batch)+"\n") 
                 f_log.close()
                 
             # Save the model checkpoints
@@ -141,23 +165,25 @@ def main(args):
             val_steps += 1
             
             #get BLEU score for corresponding batch
-            bleu_score_batch = get_bleu(targets, outputs)
+            sampled_ids = decoder.sample(features)
+            sampled_ids = sampled_ids.cpu().numpy()
+            bleu_score_batch = get_bleu(captions_val, sampled_ids,vocab)
             val_iteration_bleu.append(bleu_score_batch)
-
+            
         val_loss /= val_steps
-        print('Epoch [{}/{}], Val Loss: {:.4f}, Perplexity: {:5.4f}'
-              .format(epoch, args.num_epochs, val_loss, np.exp(val_loss)))
+        print('Epoch [{}/{}], Val Loss: {:.4f}, Bleu: '
+              .format(epoch, args.num_epochs, val_loss)+ str(bleu_score_batch))
         f_log = open(os.path.join(args.model_path, "log.txt"),"a+")
         f_log.write("Epoch: " + str(epoch) + "/" + str(args.num_epochs) + 
-                    " val loss: " + str(val_loss) + " perplexity: " + str(np.exp(val_loss)) + "\n") 
+                    " val loss: " + str(val_loss) + " Bleu: " + str(bleu_score_batch)+"\n\n") 
         f_log.close()
-        val_loss_arr.append(np.array(var_iteration_loss))
-        val_bleu_arr.append(np.array(var_iteration_bleu))
+        val_loss_arr.append(np.array(val_iteration_loss))
+        val_bleu_arr.append(np.array(val_iteration_bleu))
         
-    np.save(os.path.join(args.model_path, "train_loss.npy"), np.array(train_loss_array))
-    np.save(os.path.join(args.model_path, "val_loss.npy"), np.array(val_loss_array))
-    np.save(os.path.join(args.model_path, "train_bleu.npy"), np.array(train_bleu_array))
-    np.save(os.path.join(args.model_path, "val_bleu.npy"), np.array(val_bleu_array))
+    np.save(os.path.join(args.model_path, "train_loss.npy"), np.array(train_loss_arr))
+    np.save(os.path.join(args.model_path, "val_loss.npy"), np.array(val_loss_arr))
+    np.save(os.path.join(args.model_path, "train_bleu.npy"), np.array(train_bleu_arr))
+    np.save(os.path.join(args.model_path, "val_bleu.npy"), np.array(val_bleu_arr))
                 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
