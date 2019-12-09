@@ -8,6 +8,23 @@ This is the project "Neural Networks for Image Captioning" developed by the team
 
 Requirements
 ============
+
+Install matplotlib as follows: 
+
+    $ pip install --user matplotlib
+    
+Install numpy as follows: 
+
+    $ pip install --user numpy
+    
+Install pillow as follows: 
+
+    $ pip install --user pillow
+    
+Install argparse as follows: 
+
+    $ pip install --user argparse
+
 Install pycocotools as follows:
 
     $ pip install --user cython 
@@ -21,6 +38,37 @@ Install nltk as follows:
 Code Organization
 =================
 demo.ipynb -- Run a demo of our code (reproduces Figure 3 of our report)
+
+build_vocab.py -- Builds the vocabulary using the captions in the training data
+
 resize.py -- Pre-processes the data by resizing it
+
 data_loader.py -- return the data loader for the MSCOCO-2015 dataset
+
 model.py -- Returns the network architecture for the Encoder CNN and the decoder
+
+train.py -- training script
+
+trained_model/encoder.ckpt -- trained encoder 
+
+trained_model/decoder.ckpt --trained decoder
+
+
+Code Usage
+===========
+
+Pre-processing
+===============
+
+    $ python build_vocab.py
+    $ python resize.py
+
+Training
+========
+
+    $ python train.py
+    
+Testing
+========
+
+To test the model, run the demo.ipynb notebook
