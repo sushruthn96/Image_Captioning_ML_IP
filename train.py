@@ -28,16 +28,12 @@ def get_bleu(gt1, candidate, vocab):
         sentence_can = ' '.join(sampled_caption)
         
         gt_caption = []
-#         gt[i] = gt[i].cpu().detach().numpy()
         for word_id in gt[i]:
             word = vocab.idx2word[word_id]
             gt_caption.append(word)
             if word == '<end>':
                 break
         sentence_gt = ' '.join(gt_caption)
-#         print(gt[i])
-#         print(candidate[i,:].shape)
-#         print(sentence_bleu(gt[[i, :]], candidate[i, :]))
         score_full += sentence_bleu([sentence_gt], sentence_can)
         score_1 += sentence_bleu([sentence_gt], sentence_can, weights = (1,0,0,0))
         score_2 += sentence_bleu([sentence_gt], sentence_can, weights = (0,1,0,0))
@@ -119,9 +115,7 @@ def main(args):
             #get BLEU score for corresponding batch
             sampled_ids = decoder.sample(features)
             sampled_ids = sampled_ids.cpu().numpy()
-#             print(sampled_ids.shape, captions.shape,targets.shape)
             bleu_score_batch = get_bleu(captions, sampled_ids,vocab)
-#             print(bleu_score_batch)
             iteration_bleu.append(bleu_score_batch)
 
             # Print log info
@@ -148,7 +142,6 @@ def main(args):
         val_iteration_loss = []
         val_iteration_bleu = []
         for j, (images_val, captions_val, lengths_val) in enumerate(val_loader):
-            #are we supposed to do net.eval() here or is it okay cause we continue the training process?
             
             # Set mini-batch dataset
             images_val = images_val.to(device)
