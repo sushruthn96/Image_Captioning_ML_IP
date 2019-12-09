@@ -73,4 +73,6 @@ Testing
 
 To test the model, run the demo.ipynb notebook
 
-[a link] (https://drive.google.com/open?id=1yM34FfMRhF8RXHXqIUUqYMCrtsfKMLv1)
+The trained enocder model can be found [here.](https://drive.google.com/open?id=1fKe_CT5P-nJbyuOeD4Cl22YzJV2tK2et)
+
+The trained deocder model can be found [here.](https://drive.google.com/open?id=1yM34FfMRhF8RXHXqIUUqYMCrtsfKMLv1)
