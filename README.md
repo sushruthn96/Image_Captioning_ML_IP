@@ -79,4 +79,4 @@ The trained enocder model can be found [here.](https://drive.google.com/open?id=
 
 The trained deocder model can be found [here.](https://drive.google.com/open?id=1yM34FfMRhF8RXHXqIUUqYMCrtsfKMLv1)
 
-Create a folder called trained_models on the main directory. Download the trained encoder and decoder model into this folder. Now run demo.ipynb notebook 
+Create a folder called **trained_models** on the main directory. Download the trained encoder and decoder model into this folder. Now run demo.ipynb notebook 
